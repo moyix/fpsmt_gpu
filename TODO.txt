@@ -1,0 +1,4 @@
+* Fix up the rounding modes in NativeFloat.cu
+    - Mostly done
+    - Still need to figure out the nearest int routines
+* LOL what are unit tests
