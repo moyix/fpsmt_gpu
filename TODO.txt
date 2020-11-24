@@ -2,3 +2,6 @@
     - Mostly done
     - Still need to figure out the nearest int routines
 * LOL what are unit tests
+* Find a harder SMT formula
+* Generalize to more variables
+* Support multiple GPUs
