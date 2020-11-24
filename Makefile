@@ -14,8 +14,8 @@ smtlib-objs += SMTLIB/Messages.o
 smtlib-objs += SMTLIB/Float.o
 smtlib-objs += SMTLIB/NativeBitVector.o
 
-smt: smt.o $(smtlib-objs)
-	nvcc $^ -o $@
+smt: smt.o aes.o $(smtlib-objs)
+	nvcc $^ -o $@ -lcrypto
 
 all: smt
 
