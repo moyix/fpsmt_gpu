@@ -2,7 +2,16 @@
     - Mostly done
     - Still need to figure out the nearest int routines
 * LOL what are unit tests
+* Make it easier to run different SMT formulas
+    - John has this in his branch, just need to integrate
+* Figure out how to count executions / second
+* Performance measurement & optimization
+
+DONE:
 * Find a harder SMT formula
+    - Done
 * Generalize to more variables
+    - Done!
 * Support multiple GPUs
     - Done!
+

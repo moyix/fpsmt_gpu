@@ -38,7 +38,7 @@ private:
   constexpr dataTy mask() const {
     return (N >= 64) ? UINT64_MAX : ((UINT64_C(1) << N) - 1);
   }
-  dataTy doMod(dataTy value) const {
+  __device__ dataTy doMod(dataTy value) const {
     if (N >= 64)
       return value;
     else
