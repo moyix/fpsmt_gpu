@@ -3,3 +3,4 @@
 *.o
 smt
 bin
+theory.cu
