@@ -9,7 +9,9 @@
 
 #define AES_BLOCK_SIZE 16
 
-int varsize = 16;
+// should come from theory.cu
+extern int varsize;
+
 __device__ int solved = 0;
 volatile int finished_dev = 0;
 

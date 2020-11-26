@@ -6,7 +6,7 @@
 #    -> theory.cu
 
 set -e
-cd $(realpath $(dirname))
+cd $(realpath $(dirname $0))
 mkdir -p bin
 
 if [ "$#" = "0" ]; then
@@ -20,10 +20,18 @@ format() { clang-format - }
 
 
 transpose() {
+    while read line; do
+        if echo $line | grep "size !=" > /dev/null ; then
+            varsize=$(echo $line | awk '{ print $4 }' | tr -d ')')
+        fi
+        echo $line
+        if echo $line | grep "End program" > /dev/null ; then
+            echo "int varsize = $varsize;"
+        fi
+    done | \
     sed 's/abort();/return 1;/' | \
         sed 's/extern "C" int/__device__ int/' | \
-        sed 's/size != 32/size < 16/' | \
-        sed 's/jfs_warning("Wrong sized input tried.\\n");//' | \
+        sed '/size != /,+4d' | \
         sed 's/SMTLIB\/BitVector.h/SMTLIB\/BufferRef.h/' | \
         sed 's/#include/\/\/ #include/' | \
         sed 's/\/\/ Begin program/#include "theory.h"/'
