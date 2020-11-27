@@ -8,6 +8,7 @@
 set -e
 cd $(realpath $(dirname $0))
 mkdir -p bin
+mkdir -p cxx
 
 if [ "$#" = "0" ]; then
     echo 'Supply a theory file' 1>&2
@@ -39,19 +40,21 @@ transpose() {
 
 
 smt2cxx() {
-    docker run -it --rm -v $(pwd):/out -u $(id -u):$(id -g) \
+    docker run --rm -v $(realpath $(dirname ${1})):/out -u $(id -u):$(id -g) \
            delcypher/jfs_build:fse_2019 /home/user/jfs/build/bin/jfs-smt2cxx \
-           /out/${1}
+           /out/$(basename ${1})
 }
 
 
 
 for filename in "$@"; do
+    rm -f theory.cu
     if beginswith http "${filename}"; then
         wget "${filename}" -O theory.smt2
         filename=theory.smt2
     fi
     smt2cxx "${filename}" | transpose | format > theory.cu
-    make clean smt
-    mv smt "bin/smt-$(echo ${filename} | tr '.' '-')"
+    cp theory.cu "cxx/smt-$(basename ${filename} | tr '.' '-')".cxx
+    make smt
+    mv smt "bin/smt-$(basename ${filename} | tr '.' '-')"
 done
