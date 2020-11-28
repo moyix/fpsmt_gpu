@@ -1,0 +1,7 @@
+(set-info :smt-lib-version 2.6)
+(set-logic QF_FP)
+(declare-fun x () Float32)
+(define-fun f1 () Float32 ((_ to_fp 8 24) #x3f800000))
+(assert (fp.eq x f1))
+(check-sat)
+(exit)

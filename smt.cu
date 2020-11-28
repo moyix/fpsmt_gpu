@@ -31,9 +31,8 @@ __host__ __device__ inline int64_t aes_pad(int64_t num) {
   return (num + AES_BLOCK_SIZE - 1) & -AES_BLOCK_SIZE;
 }
 
-
 // Note: size is the *unpadded* size of the input vars
-__global__ void fuzz(uint8_t *in_data, size_t size, const uint8_t *key, uint64_t *gobuf) {
+__global__ void fuzz(uint8_t *in_data, size_t size, const uint8_t *key, uint64_t *gobuf, unsigned long long *execs) {
   int bindex = blockIdx.x * blockDim.x + threadIdx.x;
   int64_t padded = aes_pad(size);
   uint64_t offset = bindex * padded;
@@ -47,6 +46,7 @@ __global__ void fuzz(uint8_t *in_data, size_t size, const uint8_t *key, uint64_t
   }
 
   while (!solved) {
+    atomicAdd(execs, 1);
     // Randomize input for our slice
     for (int i = 0; i < padded; i += AES_BLOCK_SIZE) {
       encrypt_one_table(in_data, key, offset+i);
@@ -63,14 +63,15 @@ void CUDART_CB finishedCB(void *data) {
   finished_dev = *(int *)data;
 }
 
-void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_gobuf) {
+void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_gobuf, unsigned long long **ret_execs) {
   cudaSetDevice(device);
 
   uint8_t *gbuf;
   uint64_t *gobuf;
+  unsigned long long *gexecs;
 
   int64_t padded = aes_pad(varsize);
-
+  printf("Padding varsize from %d to %ld\n", varsize, padded);
   unsigned char ckey[AES_BLOCK_SIZE];
   FILE *rng = fopen("/dev/urandom","rb");
   fread(ckey, AES_BLOCK_SIZE, 1, rng);
@@ -80,15 +81,17 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   uint8_t rkey[176];
   const uint8_t *drkey;
   expand_key(ckey, rkey);
-  gpuErrchk(cudaMalloc(&drkey, sizeof(uint8_t) * 176));
+  gpuErrchk(cudaMalloc(&drkey, 176));
   gpuErrchk(cudaMemcpy((uint8_t *)drkey, rkey, sizeof(uint8_t) * 176, cudaMemcpyHostToDevice));
 
   // Alloc GPU buffers
-  gpuErrchk(cudaMalloc(&gbuf, padded*N*M*sizeof(uint8_t)));
+  gpuErrchk(cudaMalloc(&gbuf, padded*N*M));
   gpuErrchk(cudaMalloc(&gobuf, sizeof(uint64_t)));
+  gpuErrchk(cudaMalloc(&gexecs, sizeof(unsigned long long)));
 
   *ret_gbuf = gbuf;
   *ret_gobuf = gobuf;
+  *ret_execs = gexecs;
 
   // Start fuzzing!
   cudaStream_t stream;
@@ -96,7 +99,7 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   int *dev = (int *)malloc(sizeof(int));
   *dev = device + 1;
   printf("Launching kernel on GPU%d...\n", device);
-  fuzz<<<M,N,0,stream>>>(gbuf, varsize, drkey, gobuf);
+  fuzz<<<M,N,0,stream>>>(gbuf, varsize, drkey, gobuf, gexecs);
   gpuErrchk(cudaLaunchHostFunc(stream, finishedCB, dev));
 }
 
@@ -110,15 +113,27 @@ int main(int argc, char **argv) {
 
   uint8_t *gbuf[NUM_GPU];
   uint64_t *gobuf[NUM_GPU];
+  unsigned long long *goexecs[NUM_GPU];
 
+  struct timespec begin, end;
+  clock_gettime(CLOCK_MONOTONIC_RAW, &begin);
   for (int i = 0; i < NUM_GPU; i++) {
-    launch_kernel(i, varsize, &gbuf[i], &gobuf[i]);
+    launch_kernel(i, varsize, &gbuf[i], &gobuf[i], &goexecs[i]);
   }
 
   printf("Waiting on GPUs...\n");
   while (!finished_dev) sched_yield();
   int i = finished_dev - 1;
+  unsigned long long hexecs;
   printf("Search completed on device %d\n", i);
+  gpuErrchk(cudaMemcpy(&hexecs, goexecs[i], sizeof(unsigned long long), cudaMemcpyDeviceToHost));
+  clock_gettime(CLOCK_MONOTONIC_RAW, &end);
+  float seconds = (end.tv_nsec - begin.tv_nsec) / 1000000000.0 + (end.tv_sec  - begin.tv_sec);
+  printf("Did %llu execs in %f seconds, %f execs/s\n", hexecs, seconds, hexecs / seconds);
+
+  // Wait to finish
+  cudaSetDevice(i);
+  cudaDeviceSynchronize();
 
   // Get and print output
   int64_t padded = aes_pad(varsize);
