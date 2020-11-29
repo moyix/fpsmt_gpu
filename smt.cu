@@ -124,6 +124,9 @@ int main(int argc, char **argv) {
   printf("Waiting on GPUs...\n");
   while (!finished_dev) sched_yield();
   int i = finished_dev - 1;
+  // Wait to finish
+  cudaSetDevice(i);
+  cudaDeviceSynchronize();
   unsigned long long hexecs;
   printf("Search completed on device %d\n", i);
   gpuErrchk(cudaMemcpy(&hexecs, goexecs[i], sizeof(unsigned long long), cudaMemcpyDeviceToHost));
@@ -131,9 +134,6 @@ int main(int argc, char **argv) {
   float seconds = (end.tv_nsec - begin.tv_nsec) / 1000000000.0 + (end.tv_sec  - begin.tv_sec);
   printf("Did %llu execs in %f seconds, %f execs/s\n", hexecs, seconds, hexecs / seconds);
 
-  // Wait to finish
-  cudaSetDevice(i);
-  cudaDeviceSynchronize();
 
   // Get and print output
   int64_t padded = aes_pad(varsize);
