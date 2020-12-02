@@ -93,6 +93,10 @@ public:
     return jfs_nr_float32_smtlib_equals(data, other.data);
   }
 
+  __device__ bool operator!=(const Float32& other) const {
+    return !jfs_nr_float32_smtlib_equals(data, other.data);
+  }
+
   __device__ bool ieeeEquals(const Float32& other) const {
     return jfs_nr_float32_ieee_equals(data, other.data);
   }
@@ -220,6 +224,10 @@ public:
   // SMT-LIBv2 bit comparison
   __device__ bool operator==(const Float64& other) const {
     return jfs_nr_float64_smtlib_equals(data, other.data);
+  }
+
+  __device__ bool operator!=(const Float64& other) const {
+    return !jfs_nr_float64_smtlib_equals(data, other.data);
   }
 
   __device__ bool ieeeEquals(const Float64& other) const {
