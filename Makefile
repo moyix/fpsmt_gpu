@@ -1,3 +1,8 @@
+
+all:
+	cmake -Bbuild -GNinja .
+	cmake --build build -j $(shell nproc)
+
 SMTLIB/%.o: SMTLIB/%.cu
 	$(MAKE) -C SMTLIB
 
@@ -17,7 +22,8 @@ smtlib-objs += SMTLIB/NativeBitVector.o
 smt: theory.o smt.o aes.o $(smtlib-objs)
 	nvcc -dlto $^ -o $@
 
-all: smt
+#all: smt
 
 clean:
 	rm -f *.o SMTLIB/*.o smt
+	rm -rf build
