@@ -37,8 +37,9 @@ __host__ __device__ inline int64_t aes_pad(int64_t num) {
 __global__ void fuzz(uint8_t *in_data, size_t size, curandState *state, uint64_t *gobuf, unsigned long long *execs) {
   int bindex = blockIdx.x * blockDim.x + threadIdx.x;
 
+  int seed = bindex*37;
+  curand_init(seed, bindex, 0, &state[bindex]);
   uint8_t *data = in_data + bindex*size; // i think?
-
   curandState localState = state[bindex];
 
   while (!solved) {
@@ -68,13 +69,6 @@ void CUDART_CB finishedCB(void *data) {
   finished_dev = *(int *)data;
 }
 
-__global__ void setup_kernel(curandState *state)
-{
-    int id = threadIdx.x + blockIdx.x * blockDim.x;
-    int seed = id*37;
-    curand_init(seed, id, 0, &state[id]);
-}
-
 void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_gobuf, unsigned long long **ret_execs) {
   cudaSetDevice(device);
 
@@ -85,8 +79,6 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   int size = varsize; // i think?
   curandState *rngStates;
   gpuErrchk(cudaMalloc(&rngStates, N*M*sizeof(curandState)));
-
-  setup_kernel<<<M,N>>>(rngStates);
 
   // Alloc GPU buffers
   gpuErrchk(cudaMalloc(&gbuf, size*N*M));
