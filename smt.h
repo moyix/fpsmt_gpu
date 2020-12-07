@@ -3,7 +3,6 @@
 
 #include "SMTLIB/BufferRef.h"
 #include "SMTLIB/Float.h"
-#include "cuda_aes.h"
 
 // Threads per block
 #define N 128

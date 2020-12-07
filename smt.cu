@@ -3,7 +3,7 @@
 #include <sched.h>
 #include "SMTLIB/Float.h"
 #include "SMTLIB/BufferRef.h"
-#include "cuda_aes.h"
+#include "cham.h"
 #include "theory.h"
 #include "smt.h"
 
@@ -37,6 +37,8 @@ __global__ void fuzz(uint8_t *in_data, size_t size, const uint8_t *key, uint64_t
   int64_t padded = aes_pad(size);
   uint64_t offset = bindex * padded;
   extern __shared__ uint8_t sdata[];
+  uint8_t rks[4 * 16] = {0};
+  cham128_keygen(rks, key);
 
   // Get our local chunk
   int soff = threadIdx.x * padded;
@@ -50,7 +52,7 @@ __global__ void fuzz(uint8_t *in_data, size_t size, const uint8_t *key, uint64_t
     atomicAdd(execs, 1);
     // Randomize input for our slice
     for (int i = 0; i < padded; i += AES_BLOCK_SIZE) {
-      encrypt_one_table(sdata+soff, key, i);
+      cham128_encrypt(sdata+soff, sdata+soff, rks);
     }
     if (LLVMFuzzerTestOneInput(sdata+soff, size)) {
       *gobuf = bindex;
@@ -83,12 +85,9 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   fread(ckey, AES_BLOCK_SIZE, 1, rng);
   fclose(rng);
 
-  // Pre-expand the round keys and copy to device mem
-  uint8_t rkey[176];
-  const uint8_t *drkey;
-  expand_key(ckey, rkey);
-  gpuErrchk(cudaMalloc(&drkey, 176));
-  gpuErrchk(cudaMemcpy((uint8_t *)drkey, rkey, sizeof(uint8_t) * 176, cudaMemcpyHostToDevice));
+  const uint8_t *dkey;
+  gpuErrchk(cudaMalloc(&dkey, 16));
+  gpuErrchk(cudaMemcpy((uint8_t *)dkey, ckey, 16, cudaMemcpyHostToDevice));
 
   // Alloc GPU buffers
   gpuErrchk(cudaMalloc(&gbuf, padded*N*M));
@@ -105,7 +104,7 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   int *dev = (int *)malloc(sizeof(int));
   *dev = device + 1;
   printf("Launching kernel on GPU%d...\n", device);
-  fuzz<<<M,N,N*padded,stream>>>(gbuf, varsize, drkey, gobuf, gexecs);
+  fuzz<<<M,N,N*padded,stream>>>(gbuf, varsize, dkey, gobuf, gexecs);
   gpuErrchk(cudaPeekAtLastError());
   gpuErrchk(cudaLaunchHostFunc(stream, finishedCB, dev));
 }
