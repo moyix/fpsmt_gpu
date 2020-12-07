@@ -86,7 +86,7 @@ __device__ void encrypt_one_table(uint8_t *block, const uint8_t *rkey, uint32_t 
 
   add_round_key(block, rkey, offset);
 
-  for(int i = 1; i < 10; ++i){
+  for(int i = 1; i < 3; ++i){
 
     uint32_t *ckey = (uint32_t *)(rkey + 16*i);
 
