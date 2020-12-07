@@ -41,8 +41,8 @@ transpose() {
 
 smt2cxx() {
     docker run --rm -v $(realpath $(dirname ${1})):/out -u $(id -u):$(id -g) \
-           delcypher/jfs_build:fse_2019 /home/user/jfs/build/bin/jfs-smt2cxx \
-           /out/$(basename ${1})
+           delcypher/jfs_build:fse_2019 /bin/bash -c \
+           "/home/user/jfs/build/bin/jfs-opt -standard-passes /out/$(basename ${1}) | /home/user/jfs/build/bin/jfs-smt2cxx -branch-encoding=try-all"
 }
 
 
