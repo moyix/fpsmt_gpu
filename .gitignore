@@ -6,3 +6,5 @@ bin
 theory.cu
 build
 cmake-*
+.idea
+cxx
