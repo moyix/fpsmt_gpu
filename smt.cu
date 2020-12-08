@@ -36,11 +36,15 @@ __host__ __device__ inline int64_t aes_pad(int64_t num) {
 //__global__ void fuzz(uint8_t *in_data, size_t size, const uint8_t *key, uint64_t *gobuf, unsigned long long *execs) {
 __global__ void fuzz(uint8_t *in_data, size_t size, curandState *state, uint64_t *gobuf, unsigned long long *execs) {
   int bindex = blockIdx.x * blockDim.x + threadIdx.x;
+  int64_t padded = aes_pad(size);
+  uint64_t offset = bindex * padded;
+  int soff = threadIdx.x * padded;
 
   int seed = bindex*37;
   curand_init(seed, bindex, 0, &state[bindex]);
   uint8_t *data = in_data + bindex*size; // i think?
   curandState localState = state[bindex];
+  extern __shared__ uint8_t sdata[];
 
   while (!solved) {
     atomicAdd(execs, 1);
@@ -62,7 +66,6 @@ __global__ void fuzz(uint8_t *in_data, size_t size, curandState *state, uint64_t
       *(uint64_t *)(sdata+soff+i) = bindex * (padded/AES_BLOCK_SIZE) + i;
     }
   }
-  return;
 }
 
 void CUDART_CB finishedCB(void *data) {
