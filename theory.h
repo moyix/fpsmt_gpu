@@ -9,6 +9,6 @@ extern __device__ int solved;
 extern volatile int finished_dev;
 
 // Size of all variables needed by the SMT formula, in bytes
-__device__ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size);
+__device__ int LLVMFuzzerTestOneInput(float data, size_t size);
 
 #endif
