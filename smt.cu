@@ -1,6 +1,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sched.h>
+#include "curand_kernel.h"
 #include "SMTLIB/Float.h"
 #include "SMTLIB/BufferRef.h"
 #include "cuda_aes.h"
@@ -32,37 +33,39 @@ __host__ __device__ inline int64_t aes_pad(int64_t num) {
 }
 
 // Note: size is the *unpadded* size of the input vars
-__global__ void fuzz(uint8_t *in_data, size_t size, const uint8_t *key, uint64_t *gobuf, unsigned long long *execs) {
+//__global__ void fuzz(uint8_t *in_data, size_t size, const uint8_t *key, uint64_t *gobuf, unsigned long long *execs) {
+__global__ void fuzz(uint8_t *in_data, size_t size, curandState *state, uint64_t *gobuf, unsigned long long *execs) {
   int bindex = blockIdx.x * blockDim.x + threadIdx.x;
-  int64_t padded = aes_pad(size);
-  uint64_t offset = bindex * padded;
+  int offset = bindex * size;
+
+  int seed = bindex*37;
+  curand_init(seed, bindex, 0, &state[bindex]);
+  curandState localState = state[bindex];
+
   extern __shared__ uint8_t sdata[];
-
-  // Get our local chunk
-  int soff = threadIdx.x * padded;
-
-  // First time initialize block to i
-  for (int i = 0; i < padded; i += AES_BLOCK_SIZE) {
-    *(uint64_t *)(sdata+soff+i) = bindex * (padded/AES_BLOCK_SIZE) + i;
-  }
+  int soff = threadIdx.x * size;
+  uint8_t *data = sdata + soff;
 
   while (!solved) {
     atomicAdd(execs, 1);
     // Randomize input for our slice
-    for (int i = 0; i < padded; i += AES_BLOCK_SIZE) {
-      encrypt_one_table(sdata+soff, key, i);
+    uint8_t* curr = data;
+    //TODO: once we confirm 16bytes and we generate 8bytes, replace loop with writes
+    while (curr < data + size)
+    {
+        *curr++ = curand(&localState); //TODO: i think this is 8bytes but not sure, alternative is uint4
     }
-    if (LLVMFuzzerTestOneInput(sdata+soff, size)) {
+
+    if (LLVMFuzzerTestOneInput(data, size)) {
       *gobuf = bindex;
       memcpy(in_data+offset, sdata+soff, size);
       solved = 1;
     }
     // Add increment to randomize (I hope?)
-    for (int i = 0; i < padded; i += AES_BLOCK_SIZE) {
-      *(uint64_t *)(sdata+soff+i) = bindex * (padded/AES_BLOCK_SIZE) + i;
-    }
+    //for (int i = 0; i < padded; i += AES_BLOCK_SIZE) {
+    //  *(uint64_t *)(sdata+soff+i) = bindex * (padded/AES_BLOCK_SIZE) + i;
+    //}
   }
-  return;
 }
 
 void CUDART_CB finishedCB(void *data) {
@@ -76,22 +79,12 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   uint64_t *gobuf;
   unsigned long long *gexecs;
 
-  int64_t padded = aes_pad(varsize);
-  printf("Padding varsize from %d to %ld\n", varsize, padded);
-  unsigned char ckey[AES_BLOCK_SIZE];
-  FILE *rng = fopen("/dev/urandom","rb");
-  fread(ckey, AES_BLOCK_SIZE, 1, rng);
-  fclose(rng);
-
-  // Pre-expand the round keys and copy to device mem
-  uint8_t rkey[176];
-  const uint8_t *drkey;
-  expand_key(ckey, rkey);
-  gpuErrchk(cudaMalloc(&drkey, 176));
-  gpuErrchk(cudaMemcpy((uint8_t *)drkey, rkey, sizeof(uint8_t) * 176, cudaMemcpyHostToDevice));
+  int size = varsize; // i think?
+  curandState *rngStates;
+  gpuErrchk(cudaMalloc(&rngStates, N*M*sizeof(curandState)));
 
   // Alloc GPU buffers
-  gpuErrchk(cudaMalloc(&gbuf, padded*N*M));
+  gpuErrchk(cudaMalloc(&gbuf, size*N*M));
   gpuErrchk(cudaMalloc(&gobuf, sizeof(uint64_t)));
   gpuErrchk(cudaMalloc(&gexecs, sizeof(unsigned long long)));
 
@@ -105,8 +98,7 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   int *dev = (int *)malloc(sizeof(int));
   *dev = device + 1;
   printf("Launching kernel on GPU%d...\n", device);
-  fuzz<<<M,N,N*padded,stream>>>(gbuf, varsize, drkey, gobuf, gexecs);
-  gpuErrchk(cudaPeekAtLastError());
+  fuzz<<<M,N,N*size,stream>>>(gbuf, varsize, rngStates, gobuf, gexecs);
   gpuErrchk(cudaLaunchHostFunc(stream, finishedCB, dev));
 }
 
@@ -143,11 +135,10 @@ int main(int argc, char **argv) {
 
 
   // Get and print output
-  int64_t padded = aes_pad(varsize);
-  uint8_t *buf = (uint8_t *)malloc(padded);
+  uint8_t *buf = (uint8_t*)malloc(varsize);
   uint64_t oindex;
   gpuErrchk(cudaMemcpy(&oindex, gobuf[i], sizeof(uint64_t), cudaMemcpyDeviceToHost));
-  gpuErrchk(cudaMemcpy(buf, gbuf[i]+(oindex*padded), padded, cudaMemcpyDeviceToHost));
+  gpuErrchk(cudaMemcpy(buf, gbuf[i]+(oindex*varsize), varsize, cudaMemcpyDeviceToHost));
   printf("Found a satisfying assignment on device %d thread %lu:\n", i, oindex);
   for (int k = 0; k < varsize; k++) printf("%02x", buf[k]); printf("\n");
 }
