@@ -36,15 +36,15 @@ __host__ __device__ inline int64_t aes_pad(int64_t num) {
 //__global__ void fuzz(uint8_t *in_data, size_t size, const uint8_t *key, uint64_t *gobuf, unsigned long long *execs) {
 __global__ void fuzz(uint8_t *in_data, size_t size, curandState *state, uint64_t *gobuf, unsigned long long *execs) {
   int bindex = blockIdx.x * blockDim.x + threadIdx.x;
-  int64_t padded = aes_pad(size);
-  uint64_t offset = bindex * padded;
-  int soff = threadIdx.x * padded;
+  int offset = bindex * size;
 
   int seed = bindex*37;
   curand_init(seed, bindex, 0, &state[bindex]);
-  uint8_t *data = in_data + bindex*size; // i think?
   curandState localState = state[bindex];
+
   extern __shared__ uint8_t sdata[];
+  int soff = threadIdx.x * size;
+  uint8_t *data = sdata + soff;
 
   while (!solved) {
     atomicAdd(execs, 1);
@@ -62,9 +62,9 @@ __global__ void fuzz(uint8_t *in_data, size_t size, curandState *state, uint64_t
       solved = 1;
     }
     // Add increment to randomize (I hope?)
-    for (int i = 0; i < padded; i += AES_BLOCK_SIZE) {
-      *(uint64_t *)(sdata+soff+i) = bindex * (padded/AES_BLOCK_SIZE) + i;
-    }
+    //for (int i = 0; i < padded; i += AES_BLOCK_SIZE) {
+    //  *(uint64_t *)(sdata+soff+i) = bindex * (padded/AES_BLOCK_SIZE) + i;
+    //}
   }
 }
 
@@ -98,7 +98,7 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   int *dev = (int *)malloc(sizeof(int));
   *dev = device + 1;
   printf("Launching kernel on GPU%d...\n", device);
-  fuzz<<<M,N,0,stream>>>(gbuf, varsize, rngStates, gobuf, gexecs);
+  fuzz<<<M,N,N*size,stream>>>(gbuf, varsize, rngStates, gobuf, gexecs);
   gpuErrchk(cudaLaunchHostFunc(stream, finishedCB, dev));
 }
 
