@@ -1,7 +1,7 @@
 
 all:
 	cmake -Bbuild -GNinja .
-	cmake --build build -j $(shell nproc)
+	cmake --build build
 
 SMTLIB/%.o: SMTLIB/%.cu
 	$(MAKE) -C SMTLIB
@@ -26,4 +26,4 @@ smt: theory.o smt.o aes.o $(smtlib-objs)
 
 clean:
 	rm -f *.o SMTLIB/*.o smt
-	rm -rf build
+	rm -rf build bin cxx
