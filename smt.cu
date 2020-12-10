@@ -98,10 +98,8 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   int *dev = (int *)malloc(sizeof(int));
   *dev = device + 1;
   printf("Launching kernel on GPU%d...\n", device);
-  //fuzz<<<M,N,0,stream>>>(gbuf, varsize, rnd, gobuf, gexecs);
   fuzz<<<M,N,0,stream>>>(gbuf, varsize, rngStates, gobuf, gexecs);
   gpuErrchk(cudaLaunchHostFunc(stream, finishedCB, dev));
-  //gpuErrchk(curandDestroyGenerator(gen));
 }
 
 int main(int argc, char **argv) {
@@ -137,11 +135,10 @@ int main(int argc, char **argv) {
 
 
   // Get and print output
-  int64_t padded = aes_pad(varsize);
-  uint8_t *buf = (uint8_t *)malloc(padded);
+  uint8_t *buf = (uint8_t*)malloc(varsize);
   uint64_t oindex;
   gpuErrchk(cudaMemcpy(&oindex, gobuf[i], sizeof(uint64_t), cudaMemcpyDeviceToHost));
-  gpuErrchk(cudaMemcpy(buf, gbuf[i]+(oindex*padded), padded, cudaMemcpyDeviceToHost));
+  gpuErrchk(cudaMemcpy(buf, gbuf[i]+(oindex*varsize), varsize, cudaMemcpyDeviceToHost));
   printf("Found a satisfying assignment on device %d thread %lu:\n", i, oindex);
   for (int k = 0; k < varsize; k++) printf("%02x", buf[k]); printf("\n");
 }
