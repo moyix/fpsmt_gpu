@@ -13,6 +13,10 @@
 #include "smt.h"
 #include "theory.h"
 
+#ifndef RNG
+#error "NO RNG Specified"
+#endif
+
 #if RNG == AES
 
 #include "cuda_aes.h"
@@ -57,7 +61,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort) 
 // Note: size is the *unpadded* size of the input vars
 //__global__ void fuzz(uint8_t *in_data, size_t size, const uint8_t *key, uint64_t *gobuf, unsigned long long *execs) {
 #if RNG == CURAND
-__global__ void fuzz(uint8_t *in_data, size_t size, curandState *state, uint64_t *gobuf, unsigned long long *execs) {
+__global__ void fuzz(uint8_t *in_data, size_t size, uint64_t *gobuf, unsigned long long *execs) {
 #elif RNG == AES
 __global__ void fuzz(uint8_t *in_data, size_t size, const uint8_t *key, uint64_t *gobuf, unsigned long long *execs) {
 #elif RNG == CHAM
@@ -75,8 +79,9 @@ __global__ void fuzz(uint8_t *in_data, size_t size, const uint8_t *key, uint64_t
 
   uint8_t *data = sdata + soff;
   uint64_t seed = bindex * 37;
-  curand_init(seed, bindex, 0, &state[bindex]);
-  curandState localState = state[bindex];
+  curandState localState;
+
+  curand_init(seed, 0, 0, &localState);
 #elif RNG == AES
   int64_t padded = aes_pad(size);
   offset = bindex * padded;
@@ -159,11 +164,8 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   unsigned long long *gexecs;
 
   int size = varsize; // i think?
-#if RNG == CURAND
-  curandState *rngStates;
-  gpuErrchk(cudaMalloc(&rngStates, N * M * sizeof(curandState)));
 
-#elif RNG == AES
+#if RNG == AES
   int64_t padded = aes_pad(varsize);
   printf("Padding varsize from %d to %ld\n", varsize, padded);
   unsigned char ckey[AES_BLOCK_SIZE];
@@ -207,7 +209,7 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   *dev = device + 1;
   printf("Launching kernel on GPU%d...\n", device);
 #if RNG == CURAND
-  fuzz<<<M, N, N * size, stream>>>(gbuf, varsize, rngStates, gobuf, gexecs);
+  fuzz<<<M, N, N * size, stream>>>(gbuf, varsize, gobuf, gexecs);
 #elif RNG == AES
   fuzz<<<M, N, N * padded, stream>>>(gbuf, varsize, drkey, gobuf, gexecs);
 #elif RNG == CHAM
@@ -224,6 +226,15 @@ int main(int argc, char **argv) {
     fprintf(stderr, "No CUDA-capable GPUs detected!\n");
     return 1;
   }
+
+
+#if RNG == CURAND
+  printf("RNG=CURAND\n");
+#elif RNG == AES
+  printf("RNG=AES\n");
+#elif RNG == CHAM
+  printf("RNG=CHAM\n");
+#endif
 
   printf("Running %d iters\n", ITERS);
 

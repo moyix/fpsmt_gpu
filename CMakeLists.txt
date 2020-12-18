@@ -47,6 +47,9 @@ add_executable(smt-CURAND smt.cu theory.cu)
 add_executable(smt-AES smt.cu theory.cu cuda_aes.cu)
 add_executable(smt-CHAM smt.cu theory.cu cham.cu)
 
+target_compile_options(smt-CURAND PUBLIC ${NVCC_FLAGS} -DRNG=1)
+target_compile_options(smt-AES PUBLIC ${NVCC_FLAGS} -DRNG)
+target_compile_options(smt-CHAM PUBLIC ${NVCC_FLAGS} -DRNG=3)
 
 target_link_libraries(smt-CURAND LINK_PUBLIC smtlib)
 target_link_libraries(smt-AES LINK_PUBLIC smtlib)
@@ -60,9 +63,6 @@ set_property(TARGET smt-CURAND PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 set_property(TARGET smt-AES PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 set_property(TARGET smt-CHAM PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 
-target_compile_options(smt-CURAND PUBLIC ${NVCC_FLAGS} -DRNG=1)
-target_compile_options(smt-AES PUBLIC ${NVCC_FLAGS} -DRNG=2)
-target_compile_options(smt-CHAM PUBLIC ${NVCC_FLAGS} -DRNG=3)
 
 # Move executable after build
 add_custom_command(TARGET smt-CURAND
@@ -75,6 +75,6 @@ add_custom_command(TARGET smt-CHAM
 add_custom_command(TARGET smt-CURAND
   POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:smt-CURAND> ../bin/smt-CURAND)
 add_custom_command(TARGET smt-AES
-  POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:smt-CURAND> ../bin/smt-AES)
+  POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:smt-AES> ../bin/smt-AES)
 add_custom_command(TARGET smt-CHAM
-  POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:smt-CURAND> ../bin/smt-CHAM)
+  POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:smt-CHAM> ../bin/smt-CHAM)
