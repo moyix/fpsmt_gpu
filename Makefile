@@ -1,12 +1,6 @@
 
 all:
-	make --silent clean rng-CURAND
-	make --silent clean rng-AES
-	make --silent clean rng-CHAM
-	make --silent clean
-
-rng-%:
-	cmake -Bbuild -GNinja -DRNG=$* .
+	cmake -Bbuild -GNinja .
 	cmake --build build
 
 all-nodlto:

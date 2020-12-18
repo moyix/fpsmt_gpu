@@ -13,12 +13,7 @@ if (NOT DEFINED USEDLTO)
   set(USEDLTO ON)
 endif()
 
-if (NOT DEFINED RNG)
-    set(RNG CURAND)
-endif()
-
 message("")
-message("RNG                       ${RNG}")
 message("USEDLTO                   ${USEDLTO}")
 message("CUDA_VERSION              ${CUDA_VERSION}")
 message("CUDA_PATH                 ${CUDA_TOOLKIT_ROOT_DIR}")
@@ -30,17 +25,9 @@ if (${CUDA_VERSION_MAJOR} EQUAL 11 AND ${USEDLTO})
     set(DLTO -dlto)
 endif ()
 
-if (${RNG} STREQUAL CURAND)
-    set(RNGN 1)
-elseif(${RNG} STREQUAL AES )
-    set(RNGN 2)
-elseif(${RNG} STREQUAL CHAM )
-    set(RNGN 3)
-endif ()
-
 set(NVCC_FLAGS -Wno-deprecated-gpu-targets --expt-relaxed-constexpr
         -DJFS_RUNTIME_FAILURE_CALLS_ABORT -dc
-        -DRNG=${RNGN} -DCURAND=1 -DAES=2 -DCHAM=3)
+        -DCURAND=1 -DAES=2 -DCHAM=3)
 
 # SMTLIB
 add_library(smtlib STATIC
@@ -56,21 +43,38 @@ set_property(TARGET smtlib PROPERTY CUDA_ARCHITECTURES 35 50 72)
 target_compile_options(smtlib PUBLIC ${NVCC_FLAGS})
 
 # SMT
-if(${RNG} STREQUAL CURAND)
-    add_executable(smt smt.cu theory.cu)
-elseif(${RNG} STREQUAL AES)
-    add_executable(smt smt.cu smt.h theory.h theory.cu cuda_aes.h cuda_aes.cu)
-elseif(${RNG} STREQUAL CHAM)
-    add_executable(smt smt.cu smt.h theory.h theory.cu cham.h cham.cu)
-endif()
-target_include_directories (smt PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(smt LINK_PUBLIC smtlib)
-set_property(TARGET smt PROPERTY CUDA_ARCHITECTURES 35 50 72)
-set_property(TARGET smt PROPERTY CUDA_SEPARABLE_COMPILATION ON)
-target_compile_options(smt PUBLIC ${NVCC_FLAGS})
+add_executable(smt-CURAND smt.cu theory.cu)
+add_executable(smt-AES smt.cu theory.cu cuda_aes.cu)
+add_executable(smt-CHAM smt.cu theory.cu cham.cu)
+
+
+target_link_libraries(smt-CURAND LINK_PUBLIC smtlib)
+target_link_libraries(smt-AES LINK_PUBLIC smtlib)
+target_link_libraries(smt-CHAM LINK_PUBLIC smtlib)
+
+set_property(TARGET smt-CURAND PROPERTY CUDA_ARCHITECTURES 35 50 72)
+set_property(TARGET smt-AES PROPERTY CUDA_ARCHITECTURES 35 50 72)
+set_property(TARGET smt-CHAM PROPERTY CUDA_ARCHITECTURES 35 50 72)
+
+set_property(TARGET smt-CURAND PROPERTY CUDA_SEPARABLE_COMPILATION ON)
+set_property(TARGET smt-AES PROPERTY CUDA_SEPARABLE_COMPILATION ON)
+set_property(TARGET smt-CHAM PROPERTY CUDA_SEPARABLE_COMPILATION ON)
+
+target_compile_options(smt-CURAND PUBLIC ${NVCC_FLAGS} -DRNG=1)
+target_compile_options(smt-AES PUBLIC ${NVCC_FLAGS} -DRNG=2)
+target_compile_options(smt-CHAM PUBLIC ${NVCC_FLAGS} -DRNG=3)
 
 # Move executable after build
-add_custom_command(TARGET smt
+add_custom_command(TARGET smt-CURAND
   POST_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory ../bin/)
-add_custom_command(TARGET smt
-  POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:smt> ../bin/smt-${RNG})
+add_custom_command(TARGET smt-AES
+  POST_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory ../bin/)
+add_custom_command(TARGET smt-CHAM
+  POST_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory ../bin/)
+
+add_custom_command(TARGET smt-CURAND
+  POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:smt-CURAND> ../bin/smt-CURAND)
+add_custom_command(TARGET smt-AES
+  POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:smt-CURAND> ../bin/smt-AES)
+add_custom_command(TARGET smt-CHAM
+  POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:smt-CURAND> ../bin/smt-CHAM)

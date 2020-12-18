@@ -77,29 +77,18 @@ __global__ void fuzz(uint8_t *in_data, size_t size, const uint8_t *key, uint64_t
   uint64_t seed = bindex * 37;
   curand_init(seed, bindex, 0, &state[bindex]);
   curandState localState = state[bindex];
-  if (LLVMFuzzerTestOneInput(data, size)) {
-    *gobuf = bindex;
-    memcpy(in_data + offset, sdata + soff, size);
-    solved = 1;
-  }
-  
 #elif RNG == AES
   int64_t padded = aes_pad(size);
   offset = bindex * padded;
 
+  // Get our local chunk
+  soff = threadIdx.x * padded;
+
   // First time initialize block to i
   for (int i = 0; i < padded; i += AES_BLOCK_SIZE) {
-    *(uint64_t *)(sdata + soff + i) = bindex * (padded / AES_BLOCK_SIZE) + i;
+    *(uint64_t *)(sdata+soff+i) = bindex * (padded/AES_BLOCK_SIZE) + i;
   }
-  if (LLVMFuzzerTestOneInput(sdata + soff, size)) {
-    *gobuf = bindex;
-    memcpy(in_data + offset, sdata + soff, size);
-    solved = 1;
-  }
-  // Add increment to randomize (I hope?)
-  for (int i = 0; i < padded; i += AES_BLOCK_SIZE) {
-    *(uint64_t *)(sdata + soff + i) = bindex * (padded / AES_BLOCK_SIZE) + i;
-  }
+
 #elif RNG == CHAM
   offset = bindex * size;
   uint8_t rks[4 * 16] = {0};
@@ -125,22 +114,36 @@ __global__ void fuzz(uint8_t *in_data, size_t size, const uint8_t *key, uint64_t
     while (curr < data + size) {
       *curr++ = curand(&localState); // TODO: i think this is 8bytes but not sure, alternative is uint4
     }
+    if (LLVMFuzzerTestOneInput(data, size)) {
+      *gobuf = bindex;
+      memcpy(in_data+offset, sdata+soff, size);
+      solved = 1;
+    }
 #elif RNG == AES
     for (int i = 0; i < padded; i += AES_BLOCK_SIZE) {
-      encrypt_one_table(sdata + soff, key, i);
+      encrypt_one_table(sdata+soff, key, i);
     }
-#elif RNG == CHAM
-    for (int i = 0; i < padded; i += AES_BLOCK_SIZE) {
-      cham128_encrypt(sdata + soff, sdata + soff, rks);
-    }
-    if (LLVMFuzzerTestOneInput(sdata + soff, size)) {
+    if (LLVMFuzzerTestOneInput(sdata+soff, size)) {
       *gobuf = bindex;
-      memcpy(in_data + offset, sdata + soff, size);
+      memcpy(in_data+offset, sdata+soff, size);
       solved = 1;
     }
     // Add increment to randomize (I hope?)
     for (int i = 0; i < padded; i += AES_BLOCK_SIZE) {
-      *(uint64_t *)(sdata + soff + i) = bindex * (padded / AES_BLOCK_SIZE) + i;
+      *(uint64_t *)(sdata+soff+i) = bindex * (padded/AES_BLOCK_SIZE) + i;
+    }
+#elif RNG == CHAM
+    for (int i = 0; i < padded; i += AES_BLOCK_SIZE) {
+      cham128_encrypt(sdata+soff, sdata+soff, rks);
+    }
+    if (LLVMFuzzerTestOneInput(sdata+soff, size)) {
+      *gobuf = bindex;
+      memcpy(in_data+offset, sdata+soff, size);
+      solved = 1;
+    }
+    // Add increment to randomize (I hope?)
+    for (int i = 0; i < padded; i += AES_BLOCK_SIZE) {
+      *(uint64_t *)(sdata+soff+i) = bindex * (padded/AES_BLOCK_SIZE) + i;
     }
 #endif
   }
