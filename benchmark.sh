@@ -20,6 +20,7 @@ if [ -f results.csv ]; then
 fi
 
 # Warm up your GPU before hand
+echo "Warming up GPU"
 ./bin/smt-CHAM &> /dev/null
 rm results.csv
 
