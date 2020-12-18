@@ -13,9 +13,14 @@ if (NOT DEFINED USEDLTO)
   set(USEDLTO ON)
 endif()
 
+if (NOT DEFINED RNG)
+    set(RNG CURAND)
+endif()
+
 message("")
-message("CUDA_VERSION              ${CUDA_VERSION}")
+message("RNG                       ${RNG}")
 message("USEDLTO                   ${USEDLTO}")
+message("CUDA_VERSION              ${CUDA_VERSION}")
 message("CUDA_PATH                 ${CUDA_TOOLKIT_ROOT_DIR}")
 message("CMAKE_CUDA_COMPILER       ${CMAKE_CUDA_COMPILER}")
 message("CMAKE_CUDA_ARCHETECTURES  ${CMAKE_CUDA_ARCHETECTURES}")
@@ -25,7 +30,17 @@ if (${CUDA_VERSION_MAJOR} EQUAL 11 AND ${USEDLTO})
     set(DLTO -dlto)
 endif ()
 
-set(NVCC_FLAGS -Wno-deprecated-gpu-targets --expt-relaxed-constexpr -DJFS_RUNTIME_FAILURE_CALLS_ABORT -dc)
+if (${RNG} STREQUAL CURAND)
+    set(RNGN 1)
+elseif(${RNG} STREQUAL AES )
+    set(RNGN 2)
+elseif(${RNG} STREQUAL CHAM )
+    set(RNGN 3)
+endif ()
+
+set(NVCC_FLAGS -Wno-deprecated-gpu-targets --expt-relaxed-constexpr
+        -DJFS_RUNTIME_FAILURE_CALLS_ABORT -dc
+        -DRNG=${RNGN} -DCURAND=1 -DAES=2 -DCHAM=3)
 
 # SMTLIB
 add_library(smtlib STATIC
@@ -41,7 +56,13 @@ set_property(TARGET smtlib PROPERTY CUDA_ARCHITECTURES 35 50 72)
 target_compile_options(smtlib PUBLIC ${NVCC_FLAGS})
 
 # SMT
-add_executable(smt smt.cu smt.h theory.h theory.cu)
+if(${RNG} STREQUAL CURAND)
+    add_executable(smt smt.cu smt.h theory.h theory.cu)
+elseif(${RNG} STREQUAL AES)
+    add_executable(smt smt.cu smt.h theory.h theory.cu cuda_aes.h cuda_aes.cu)
+elseif(${RNG} STREQUAL CHAM)
+    add_executable(smt smt.cu smt.h theory.h theory.cu cham.h cham.cu)
+endif()
 target_include_directories (smt PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(smt LINK_PUBLIC smtlib)
 set_property(TARGET smt PROPERTY CUDA_ARCHITECTURES 35 50 72)
