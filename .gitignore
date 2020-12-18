@@ -8,3 +8,4 @@ build
 cmake-*
 .idea
 cxx
+results.csv

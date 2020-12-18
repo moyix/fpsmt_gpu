@@ -1,5 +1,8 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include <sched.h>
 #include <sys/time.h>
+#include <unistd.h>
 #include <time.h>
 #if RNG == CURAND
 // It won't build unless this include is on this line. I have no idea why.
@@ -27,7 +30,11 @@ __host__ __device__ inline int64_t aes_pad(int64_t num) { return (num + AES_BLOC
 
 #endif
 
-#define ITERS 1000000
+#ifndef ITERS
+#define ITERS 1000
+#endif
+
+#define RESULTS_FNAME "results.csv"
 
 // should come from theory.cu
 extern int varsize;
@@ -107,8 +114,8 @@ __global__ void fuzz(uint8_t *in_data, size_t size, const uint8_t *key, uint64_t
   }
 #endif
 
+  atomicAdd(execs, ITERS);
   for (int i = 0; i < ITERS; i++) {
-    atomicAdd(execs, 1);
     // Randomize input for our slice
 
 #if RNG == CURAND
@@ -214,6 +221,8 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  printf("Running %d iters\n", ITERS);
+
   uint8_t *gbuf[NUM_GPU];
   uint64_t *gobuf[NUM_GPU];
   unsigned long long *goexecs[NUM_GPU];
@@ -237,6 +246,34 @@ int main(int argc, char **argv) {
   clock_gettime(CLOCK_MONOTONIC_RAW, &end);
   float seconds = (end.tv_nsec - begin.tv_nsec) / 1000000000.0 + (end.tv_sec - begin.tv_sec);
   printf("Did %llu execs in %f seconds, %f execs/s\n", hexecs, seconds, hexecs / seconds);
+
+  cudaDeviceProp prop;
+  cudaGetDeviceProperties(&prop, 0);
+
+  FILE *results_fd;
+  if (access(RESULTS_FNAME, F_OK) == 0) {
+    results_fd = fopen(RESULTS_FNAME, "a");
+  } else {
+    results_fd = fopen(RESULTS_FNAME, "w");
+    fprintf(results_fd, "RNG,execs,seconds,execsps,iters,threads per block,number of blocks,dev name,dev mem rate (KHz),dev bus width (bits),dev peak mem bandwidth (GB/s)\n"); // write headers
+  }
+
+#if RNG == CURAND
+  const char* rngname = "CURAND";
+#elif RNG == AES
+  const char* rngname = "AES";
+#elif RNG == CHAM
+  const char* rngname = "CHAM";
+#endif
+
+  printf("writing results to ");
+  printf(RESULTS_FNAME);
+  printf("\n");
+  fprintf(results_fd, "%s,%llu,%f,%f,%d,%d,%s,%d,%d,%f\n", rngname, hexecs, seconds, hexecs/seconds,
+          N, M,
+          prop.name, prop.memoryClockRate, prop.memoryBusWidth,
+          2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e6);
+  fclose(results_fd);
 
 #if RNG == CURAND
   if (host_solved) {

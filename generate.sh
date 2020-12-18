@@ -55,6 +55,5 @@ for filename in "$@"; do
     fi
     smt2cxx "${filename}" | transpose | format > theory.cu
     cp theory.cu "cxx/smt-$(basename ${filename} | tr '.' '-')".cxx
-    make
-    mv bin/smt "bin/smt-$(basename ${filename} | tr '.' '-')"
+    rm -rf cxx
 done

@@ -1,9 +1,9 @@
-cmake_minimum_required(VERSION 3.19)
+cmake_minimum_required(VERSION 3.14)
 project(smt)
 
 
 # Find CUDA
-find_package(CUDA 10 EXACT)
+find_package(CUDA 11)
 enable_language(CUDA)
 set(ENV{CUDA_PATH} ${CUDA_TOOLKIT_ROOT_DIR})
 set(CMAKE_CUDA_COMPILER ${CUDA_TOOLKIT_ROOT_DIR}/bin/nvcc)
