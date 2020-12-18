@@ -1,7 +1,9 @@
 
 all:
-	cmake -Bbuild -GNinja .
-	cmake --build build
+	make --silent clean rng-CURAND
+	make --silent clean rng-AES
+	make --silent clean rng-CHAM
+	make --silent clean
 
 rng-%:
 	cmake -Bbuild -GNinja -DRNG=$* .
@@ -13,4 +15,4 @@ all-nodlto:
 
 clean:
 	rm -f *.o SMTLIB/*.o smt
-	rm -rf build bin cxx
+	rm -rf build cxx

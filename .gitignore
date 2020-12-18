@@ -9,3 +9,4 @@ cmake-*
 .idea
 cxx
 results.csv
+results-*.csv

@@ -73,4 +73,4 @@ target_compile_options(smt PUBLIC ${NVCC_FLAGS})
 add_custom_command(TARGET smt
   POST_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory ../bin/)
 add_custom_command(TARGET smt
-  POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:smt> ../bin/)
+  POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:smt> ../bin/smt-${RNG})
