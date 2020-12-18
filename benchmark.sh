@@ -25,7 +25,7 @@ echo "Warming up GPU"
 rm results.csv
 
 # Run benchmarks
-iters=10
+iters=750
 for i in $(seq ${iters}); do
     echo "Running smt CURAND [${i}/${iters}]"
     ./bin/smt-CURAND &>/dev/null
