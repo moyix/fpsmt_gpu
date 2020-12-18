@@ -82,6 +82,7 @@ __global__ void fuzz(uint8_t *in_data, size_t size, const uint8_t *key, uint64_t
     memcpy(in_data + offset, sdata + soff, size);
     solved = 1;
   }
+  
 #elif RNG == AES
   int64_t padded = aes_pad(size);
   offset = bindex * padded;
