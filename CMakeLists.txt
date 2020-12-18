@@ -1,9 +1,9 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.19)
 project(smt)
 
 
 # Find CUDA
-find_package(CUDA 11)
+find_package(CUDA 10 EXACT)
 enable_language(CUDA)
 set(ENV{CUDA_PATH} ${CUDA_TOOLKIT_ROOT_DIR})
 set(CMAKE_CUDA_COMPILER ${CUDA_TOOLKIT_ROOT_DIR}/bin/nvcc)
@@ -57,7 +57,7 @@ target_compile_options(smtlib PUBLIC ${NVCC_FLAGS})
 
 # SMT
 if(${RNG} STREQUAL CURAND)
-    add_executable(smt smt.cu smt.h theory.h theory.cu)
+    add_executable(smt smt.cu theory.cu)
 elseif(${RNG} STREQUAL AES)
     add_executable(smt smt.cu smt.h theory.h theory.cu cuda_aes.h cuda_aes.cu)
 elseif(${RNG} STREQUAL CHAM)
