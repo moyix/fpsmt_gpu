@@ -7,12 +7,7 @@ set -e
 cd $(dirname $(realpath 0))
 
 # Make the things
-for rng in CURAND AES CHAM; do
-    if [ ! -f ./bin/smt-${rng} ]; then
-        echo "Making bin/smt-${rng}"
-        make clean rng-${rng} 1> /dev/null
-    fi
-done
+make all &> /dev/null
 
 # Backup previous results
 if [ -f results.csv ]; then
