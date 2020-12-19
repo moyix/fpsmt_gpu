@@ -48,7 +48,7 @@ add_executable(smt-AES smt.cu theory.cu cuda_aes.cu)
 add_executable(smt-CHAM smt.cu theory.cu cham.cu)
 
 target_compile_options(smt-CURAND PUBLIC ${NVCC_FLAGS} -DRNG=1)
-target_compile_options(smt-AES PUBLIC ${NVCC_FLAGS} -DRNG)
+target_compile_options(smt-AES PUBLIC ${NVCC_FLAGS} -DRNG=2)
 target_compile_options(smt-CHAM PUBLIC ${NVCC_FLAGS} -DRNG=3)
 
 target_link_libraries(smt-CURAND LINK_PUBLIC smtlib)

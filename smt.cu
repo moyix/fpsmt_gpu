@@ -35,7 +35,7 @@ __host__ __device__ inline int64_t aes_pad(int64_t num) { return (num + AES_BLOC
 #endif
 
 #ifndef ITERS
-#define ITERS 10000
+#define ITERS 1000000
 #endif
 
 #define RESULTS_FNAME "results.csv"
@@ -215,7 +215,7 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
 #elif RNG == CHAM
   fuzz<<<M, N, N * padded, stream>>>(gbuf, varsize, dkey, gobuf, gexecs);
 #endif
-  cudaMemcpy(&host_solved, &solved, sizeof(int), cudaMemcpyDeviceToHost);
+  // cudaMemcpy(&host_solved, &solved, sizeof(int), cudaMemcpyDeviceToHost);
   gpuErrchk(cudaLaunchHostFunc(stream, finishedCB, dev));
 }
 
