@@ -35,7 +35,7 @@ __host__ __device__ inline int64_t aes_pad(int64_t num) { return (num + AES_BLOC
 #endif
 
 #ifndef ITERS
-#define ITERS 1000000
+#define ITERS 10000
 #endif
 
 #define RESULTS_FNAME "results.csv"
