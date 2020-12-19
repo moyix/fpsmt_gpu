@@ -187,7 +187,7 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   gpuErrchk(cudaMemcpy((uint8_t *)drkey, rkey, sizeof(uint8_t) * 176, cudaMemcpyHostToDevice));
 
   // Alloc GPU buffers
-  gpuErrchk(cudaMalloc(&gbuf, size * N * M));
+  gpuErrchk(cudaMalloc(&gbuf, padded * N * M));
   gpuErrchk(cudaMalloc(&gobuf, sizeof(uint64_t)));
   gpuErrchk(cudaMalloc(&gexecs, sizeof(unsigned long long)));
 
