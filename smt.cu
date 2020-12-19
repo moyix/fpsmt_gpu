@@ -163,10 +163,10 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   uint64_t *gobuf;
   unsigned long long *gexecs;
 
-  int size = varsize; // i think?
- 
+
 #if RNG == CURAND
   // Alloc GPU buffers
+  int size = varsize; // i think?
   gpuErrchk(cudaMalloc(&gbuf, size * N * M));
   gpuErrchk(cudaMalloc(&gobuf, sizeof(uint64_t)));
   gpuErrchk(cudaMalloc(&gexecs, sizeof(unsigned long long)));
@@ -281,7 +281,7 @@ int main(int argc, char **argv) {
     results_fd = fopen(RESULTS_FNAME, "a");
   } else {
     results_fd = fopen(RESULTS_FNAME, "w");
-    fprintf(results_fd, "RNG,execs,seconds,execsps,iters,threads per block,number of blocks,dev name,dev mem rate (KHz),dev bus width (bits),dev peak mem bandwidth (GB/s)\n"); // write headers
+    fprintf(results_fd, "RNG,execs,seconds,execsps,iters,threads per block,number of blocks,dev name,num devs,dev mem rate (KHz),dev bus width (bits),dev peak mem bandwidth (GB/s)\n"); // write headers
   }
 
 #if RNG == CURAND
@@ -295,9 +295,9 @@ int main(int argc, char **argv) {
   printf("writing results to ");
   printf(RESULTS_FNAME);
   printf("\n");
-  fprintf(results_fd, "%s,%llu,%f,%f,%d,%d,%s,%d,%d,%f\n", rngname, hexecs, seconds, hexecs/seconds,
-          N, M,
-          prop.name, prop.memoryClockRate, prop.memoryBusWidth,
+  fprintf(results_fd, "%s,%llu,%f,%f,%d,%d,%d,%s,%d,%d,%d,%f\n",
+          rngname, hexecs*NUM_GPU, seconds, (hexecs*NUM_GPU)/seconds, ITERS, N, M,
+          prop.name, NUM_GPU, prop.memoryClockRate, prop.memoryBusWidth,
           2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e6);
   fclose(results_fd);
 
