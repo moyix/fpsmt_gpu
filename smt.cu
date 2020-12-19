@@ -164,8 +164,14 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   unsigned long long *gexecs;
 
   int size = varsize; // i think?
+ 
+#if RNG == CURAND
+  // Alloc GPU buffers
+  gpuErrchk(cudaMalloc(&gbuf, size * N * M));
+  gpuErrchk(cudaMalloc(&gobuf, sizeof(uint64_t)));
+  gpuErrchk(cudaMalloc(&gexecs, sizeof(unsigned long long)));
 
-#if RNG == AES
+#elif RNG == AES
   int64_t padded = aes_pad(varsize);
   printf("Padding varsize from %d to %ld\n", varsize, padded);
   unsigned char ckey[AES_BLOCK_SIZE];
@@ -180,6 +186,11 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   gpuErrchk(cudaMalloc(&drkey, 176));
   gpuErrchk(cudaMemcpy((uint8_t *)drkey, rkey, sizeof(uint8_t) * 176, cudaMemcpyHostToDevice));
 
+  // Alloc GPU buffers
+  gpuErrchk(cudaMalloc(&gbuf, size * N * M));
+  gpuErrchk(cudaMalloc(&gobuf, sizeof(uint64_t)));
+  gpuErrchk(cudaMalloc(&gexecs, sizeof(unsigned long long)));
+
 #elif RNG == CHAM
   int64_t padded = aes_pad(varsize);
   printf("Padding varsize from %d to %ld\n", varsize, padded);
@@ -191,12 +202,12 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   const uint8_t *dkey;
   gpuErrchk(cudaMalloc(&dkey, 16));
   gpuErrchk(cudaMemcpy((uint8_t *)dkey, ckey, 16, cudaMemcpyHostToDevice));
-#endif
 
   // Alloc GPU buffers
-  gpuErrchk(cudaMalloc(&gbuf, size * N * M));
+  gpuErrchk(cudaMalloc(&gbuf, padded*N*M));
   gpuErrchk(cudaMalloc(&gobuf, sizeof(uint64_t)));
   gpuErrchk(cudaMalloc(&gexecs, sizeof(unsigned long long)));
+#endif
 
   *ret_gbuf = gbuf;
   *ret_gobuf = gobuf;
@@ -215,7 +226,7 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
 #elif RNG == CHAM
   fuzz<<<M, N, N * padded, stream>>>(gbuf, varsize, dkey, gobuf, gexecs);
 #endif
-  // cudaMemcpy(&host_solved, &solved, sizeof(int), cudaMemcpyDeviceToHost);
+  cudaMemcpy(&host_solved, &solved, sizeof(int), cudaMemcpyDeviceToHost);
   gpuErrchk(cudaLaunchHostFunc(stream, finishedCB, dev));
 }
 
@@ -290,19 +301,5 @@ int main(int argc, char **argv) {
           2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e6);
   fclose(results_fd);
 
-#if RNG == CURAND
-  if (host_solved) {
-    // Get and print output
-    uint8_t *buf = (uint8_t *)malloc(varsize);
-    uint64_t oindex;
-    gpuErrchk(cudaMemcpy(&oindex, gobuf[i], sizeof(uint64_t), cudaMemcpyDeviceToHost));
-    gpuErrchk(cudaMemcpy(buf, gbuf[i] + (oindex * varsize), varsize, cudaMemcpyDeviceToHost));
-    printf("Found a satisfying assignment on device %d thread %lu:\n", i, oindex);
-    for (int k = 0; k < varsize; k++)
-      printf("%02x", buf[k]);
-    printf("\n");
-  } else {
-    fprintf(stderr, "No satisfying assignment found");
-  }
-#endif
+  //We don't need to print result, just benchmarking
 }
