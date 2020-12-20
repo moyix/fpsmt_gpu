@@ -4,6 +4,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <time.h>
+#include <nvml.h>
 #if RNG == CURAND
 // It won't build unless this include is on this line. I have no idea why.
 #include "curand_kernel.h"
@@ -163,15 +164,9 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   uint64_t *gobuf;
   unsigned long long *gexecs;
 
-
-#if RNG == CURAND
-  // Alloc GPU buffers
   int size = varsize; // i think?
-  gpuErrchk(cudaMalloc(&gbuf, size * N * M));
-  gpuErrchk(cudaMalloc(&gobuf, sizeof(uint64_t)));
-  gpuErrchk(cudaMalloc(&gexecs, sizeof(unsigned long long)));
 
-#elif RNG == AES
+#if RNG == AES
   int64_t padded = aes_pad(varsize);
   printf("Padding varsize from %d to %ld\n", varsize, padded);
   unsigned char ckey[AES_BLOCK_SIZE];
@@ -186,11 +181,6 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   gpuErrchk(cudaMalloc(&drkey, 176));
   gpuErrchk(cudaMemcpy((uint8_t *)drkey, rkey, sizeof(uint8_t) * 176, cudaMemcpyHostToDevice));
 
-  // Alloc GPU buffers
-  gpuErrchk(cudaMalloc(&gbuf, padded * N * M));
-  gpuErrchk(cudaMalloc(&gobuf, sizeof(uint64_t)));
-  gpuErrchk(cudaMalloc(&gexecs, sizeof(unsigned long long)));
-
 #elif RNG == CHAM
   int64_t padded = aes_pad(varsize);
   printf("Padding varsize from %d to %ld\n", varsize, padded);
@@ -202,12 +192,12 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   const uint8_t *dkey;
   gpuErrchk(cudaMalloc(&dkey, 16));
   gpuErrchk(cudaMemcpy((uint8_t *)dkey, ckey, 16, cudaMemcpyHostToDevice));
+#endif
 
   // Alloc GPU buffers
-  gpuErrchk(cudaMalloc(&gbuf, padded*N*M));
+  gpuErrchk(cudaMalloc(&gbuf, size * N * M));
   gpuErrchk(cudaMalloc(&gobuf, sizeof(uint64_t)));
   gpuErrchk(cudaMalloc(&gexecs, sizeof(unsigned long long)));
-#endif
 
   *ret_gbuf = gbuf;
   *ret_gobuf = gobuf;
@@ -281,7 +271,7 @@ int main(int argc, char **argv) {
     results_fd = fopen(RESULTS_FNAME, "a");
   } else {
     results_fd = fopen(RESULTS_FNAME, "w");
-    fprintf(results_fd, "RNG,execs,seconds,execsps,iters,threads per block,number of blocks,dev name,num devs,dev mem rate (KHz),dev bus width (bits),dev peak mem bandwidth (GB/s)\n"); // write headers
+    fprintf(results_fd, "RNG,execs,seconds,execsps,iters,threads per block,number of blocks,dev name,dev mem rate (KHz),dev bus width (bits),dev peak mem bandwidth (GB/s)\n"); // write headers
   }
 
 #if RNG == CURAND
@@ -295,11 +285,33 @@ int main(int argc, char **argv) {
   printf("writing results to ");
   printf(RESULTS_FNAME);
   printf("\n");
-  fprintf(results_fd, "%s,%llu,%f,%f,%d,%d,%d,%s,%d,%d,%d,%f\n",
-          rngname, hexecs*NUM_GPU, seconds, (hexecs*NUM_GPU)/seconds, ITERS, N, M,
-          prop.name, NUM_GPU, prop.memoryClockRate, prop.memoryBusWidth,
+  fprintf(results_fd, "%s,%llu,%f,%f,%d,%d,%s,%d,%d,%f\n", rngname, hexecs, seconds, hexecs/seconds,
+          N, M,
+          prop.name, prop.memoryClockRate, prop.memoryBusWidth,
           2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e6);
   fclose(results_fd);
 
-  //We don't need to print result, just benchmarking
+  uint32_t n_dev, temp;
+  nvmlDevice_t dev;
+
+  nvmlInit();
+  nvmlDeviceGetCount(&n_dev);
+  nvmlDeviceGetHandleByIndex_v2(0, &dev);
+  nvmlDeviceGetTemperature(dev, NVML_TEMPERATURE_GPU, &temp);
+
+#if RNG == CURAND
+  if (host_solved) {
+    // Get and print output
+    uint8_t *buf = (uint8_t *)malloc(varsize);
+    uint64_t oindex;
+    gpuErrchk(cudaMemcpy(&oindex, gobuf[i], sizeof(uint64_t), cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(buf, gbuf[i] + (oindex * varsize), varsize, cudaMemcpyDeviceToHost));
+    printf("Found a satisfying assignment on device %d thread %lu:\n", i, oindex);
+    for (int k = 0; k < varsize; k++)
+      printf("%02x", buf[k]);
+    printf("\n");
+  } else {
+    fprintf(stderr, "No satisfying assignment found");
+  }
+#endif
 }

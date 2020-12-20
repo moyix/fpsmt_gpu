@@ -8,5 +8,5 @@ build
 cmake-*
 .idea
 cxx
-results.csv
-results-*.csv
+./results.csv
+./results-*.csv
