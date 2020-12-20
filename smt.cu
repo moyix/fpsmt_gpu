@@ -36,7 +36,7 @@ __host__ __device__ inline int64_t aes_pad(int64_t num) { return (num + AES_BLOC
 #endif
 
 #ifndef ITERS
-#define ITERS 10000
+#define ITERS 100
 #endif
 
 #define RESULTS_FNAME "results.csv"
@@ -271,7 +271,11 @@ int main(int argc, char **argv) {
     results_fd = fopen(RESULTS_FNAME, "a");
   } else {
     results_fd = fopen(RESULTS_FNAME, "w");
-    fprintf(results_fd, "RNG,execs,seconds,execsps,iters,threads per block,number of blocks,dev name,dev mem rate (KHz),dev bus width (bits),dev peak mem bandwidth (GB/s)\n"); // write headers
+
+    // write headers
+    fprintf(results_fd, "RNG,execs,seconds,execsps,iters,threads per block,number of blocks,");
+    fprintf(results_fd, "dev name,num devs,dev mem rate (KHz),dev bus width (bits),dev peak mem bandwidth (GB/s),");
+    fprintf(results_fd, "dev 0 temp,dev 0 clock,dev 1 temp,dev 1 clock");
   }
 
 #if RNG == CURAND
@@ -285,33 +289,25 @@ int main(int argc, char **argv) {
   printf("writing results to ");
   printf(RESULTS_FNAME);
   printf("\n");
-  fprintf(results_fd, "%s,%llu,%f,%f,%d,%d,%s,%d,%d,%f\n", rngname, hexecs, seconds, hexecs/seconds,
-          N, M,
-          prop.name, prop.memoryClockRate, prop.memoryBusWidth,
+  fprintf(results_fd, "%s,%llu,%f,%f,%d,%d,%d,%s,%d,%d,%d,%f,",
+          rngname, hexecs*NUM_GPU, seconds, (hexecs*NUM_GPU)/seconds, ITERS, N, M,
+          prop.name, NUM_GPU, prop.memoryClockRate, prop.memoryBusWidth,
           2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e6);
+
+  uint32_t temp, clock;
+  nvmlDevice_t dev;
+  for (size_t dev_n=0; dev_n<NUM_GPU; ++dev_n) {
+    if (dev_n > 0)
+      fprintf(results_fd, ",");
+    nvmlDeviceGetHandleByIndex_v2(0, &dev);
+    nvmlDeviceGetTemperature(dev, NVML_TEMPERATURE_GPU, &temp);
+    nvmlDeviceGetClockInfo(dev, NVML_CLOCK_GRAPHICS, &clock);
+    fprintf(results_fd, "%d,%d", temp, clock);
+  }
+  fprintf(results_fd, "\n");
   fclose(results_fd);
 
-  uint32_t n_dev, temp;
-  nvmlDevice_t dev;
+  //We don't need to print result, just benchmarking
 
-  nvmlInit();
-  nvmlDeviceGetCount(&n_dev);
-  nvmlDeviceGetHandleByIndex_v2(0, &dev);
-  nvmlDeviceGetTemperature(dev, NVML_TEMPERATURE_GPU, &temp);
 
-#if RNG == CURAND
-  if (host_solved) {
-    // Get and print output
-    uint8_t *buf = (uint8_t *)malloc(varsize);
-    uint64_t oindex;
-    gpuErrchk(cudaMemcpy(&oindex, gobuf[i], sizeof(uint64_t), cudaMemcpyDeviceToHost));
-    gpuErrchk(cudaMemcpy(buf, gbuf[i] + (oindex * varsize), varsize, cudaMemcpyDeviceToHost));
-    printf("Found a satisfying assignment on device %d thread %lu:\n", i, oindex);
-    for (int k = 0; k < varsize; k++)
-      printf("%02x", buf[k]);
-    printf("\n");
-  } else {
-    fprintf(stderr, "No satisfying assignment found");
-  }
-#endif
 }

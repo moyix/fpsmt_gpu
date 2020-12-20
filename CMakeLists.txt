@@ -7,7 +7,7 @@ find_package(CUDA 11)
 enable_language(CUDA)
 set(ENV{CUDA_PATH} ${CUDA_TOOLKIT_ROOT_DIR})
 set(CMAKE_CUDA_COMPILER ${CUDA_TOOLKIT_ROOT_DIR}/bin/nvcc)
-set(CMAKE_CUDA_ARCHETECTURES 35 50 72)
+set(CMAKE_CUDA_ARCHETECTURES 35 50 75 80)
 
 if (NOT DEFINED USEDLTO)
   set(USEDLTO ON)
@@ -28,6 +28,8 @@ endif ()
 set(NVCC_FLAGS -Wno-deprecated-gpu-targets --expt-relaxed-constexpr
         -DJFS_RUNTIME_FAILURE_CALLS_ABORT -dc
         -DCURAND=1 -DAES=2 -DCHAM=3)
+
+set(LDFLAGS -lnvidia-ml -L/lib)
 
 # SMTLIB
 add_library(smtlib STATIC
@@ -50,6 +52,10 @@ add_executable(smt-CHAM smt.cu theory.cu cham.cu)
 target_compile_options(smt-CURAND PUBLIC ${NVCC_FLAGS} -DRNG=1)
 target_compile_options(smt-AES PUBLIC ${NVCC_FLAGS} -DRNG=2)
 target_compile_options(smt-CHAM PUBLIC ${NVCC_FLAGS} -DRNG=3)
+
+target_link_options(smt-CURAND PUBLIC ${LDFLAGS})
+target_link_options(smt-AES PUBLIC ${LDFLAGS})
+target_link_options(smt-CHAM PUBLIC ${LDFLAGS})
 
 target_link_libraries(smt-CURAND LINK_PUBLIC smtlib)
 target_link_libraries(smt-AES LINK_PUBLIC smtlib)
