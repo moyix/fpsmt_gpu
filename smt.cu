@@ -1,10 +1,10 @@
+#include <nvml.h>
+#include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sched.h>
 #include <sys/time.h>
-#include <unistd.h>
 #include <time.h>
-#include <nvml.h>
+#include <unistd.h>
 #if RNG == CURAND
 // It won't build unless this include is on this line. I have no idea why.
 #include "curand_kernel.h"
@@ -36,10 +36,11 @@ __host__ __device__ inline int64_t aes_pad(int64_t num) { return (num + AES_BLOC
 #endif
 
 #ifndef ITERS
-#define ITERS 100
+#define ITERS 10000
 #endif
 
 #define RESULTS_FNAME "results.csv"
+#define MONITOR_FNAME "monitor.csv"
 
 // should come from theory.cu
 extern int varsize;
@@ -92,7 +93,7 @@ __global__ void fuzz(uint8_t *in_data, size_t size, const uint8_t *key, uint64_t
 
   // First time initialize block to i
   for (int i = 0; i < padded; i += AES_BLOCK_SIZE) {
-    *(uint64_t *)(sdata+soff+i) = bindex * (padded/AES_BLOCK_SIZE) + i;
+    *(uint64_t *)(sdata + soff + i) = bindex * (padded / AES_BLOCK_SIZE) + i;
   }
 
 #elif RNG == CHAM
@@ -122,34 +123,34 @@ __global__ void fuzz(uint8_t *in_data, size_t size, const uint8_t *key, uint64_t
     }
     if (LLVMFuzzerTestOneInput(data, size)) {
       *gobuf = bindex;
-      memcpy(in_data+offset, sdata+soff, size);
+      memcpy(in_data + offset, sdata + soff, size);
       solved = 1;
     }
 #elif RNG == AES
     for (int i = 0; i < padded; i += AES_BLOCK_SIZE) {
-      encrypt_one_table(sdata+soff, key, i);
+      encrypt_one_table(sdata + soff, key, i);
     }
-    if (LLVMFuzzerTestOneInput(sdata+soff, size)) {
+    if (LLVMFuzzerTestOneInput(sdata + soff, size)) {
       *gobuf = bindex;
-      memcpy(in_data+offset, sdata+soff, size);
+      memcpy(in_data + offset, sdata + soff, size);
       solved = 1;
     }
     // Add increment to randomize (I hope?)
     for (int i = 0; i < padded; i += AES_BLOCK_SIZE) {
-      *(uint64_t *)(sdata+soff+i) = bindex * (padded/AES_BLOCK_SIZE) + i;
+      *(uint64_t *)(sdata + soff + i) = bindex * (padded / AES_BLOCK_SIZE) + i;
     }
 #elif RNG == CHAM
     for (int i = 0; i < padded; i += AES_BLOCK_SIZE) {
-      cham128_encrypt(sdata+soff, sdata+soff, rks);
+      cham128_encrypt(sdata + soff, sdata + soff, rks);
     }
-    if (LLVMFuzzerTestOneInput(sdata+soff, size)) {
+    if (LLVMFuzzerTestOneInput(sdata + soff, size)) {
       *gobuf = bindex;
-      memcpy(in_data+offset, sdata+soff, size);
+      memcpy(in_data + offset, sdata + soff, size);
       solved = 1;
     }
     // Add increment to randomize (I hope?)
     for (int i = 0; i < padded; i += AES_BLOCK_SIZE) {
-      *(uint64_t *)(sdata+soff+i) = bindex * (padded/AES_BLOCK_SIZE) + i;
+      *(uint64_t *)(sdata + soff + i) = bindex * (padded / AES_BLOCK_SIZE) + i;
     }
 #endif
   }
@@ -221,19 +222,26 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
 }
 
 int main(int argc, char **argv) {
-  int NUM_GPU;
+  int NUM_GPU, epoch;
   gpuErrchk(cudaGetDeviceCount(&NUM_GPU));
   if (NUM_GPU < 1) {
     fprintf(stderr, "No CUDA-capable GPUs detected!\n");
     return 1;
   }
 
+  if (argc > 1)
+    epoch = atoi(argv[1]);
+  else
+    epoch = 1;
 
 #if RNG == CURAND
+  const char *rngname = "CURAND";
   printf("RNG=CURAND\n");
 #elif RNG == AES
+  const char *rngname = "AES";
   printf("RNG=AES\n");
 #elif RNG == CHAM
+  const char *rngname = "CHAM";
   printf("RNG=CHAM\n");
 #endif
 
@@ -249,9 +257,41 @@ int main(int argc, char **argv) {
     launch_kernel(i, varsize, &gbuf[i], &gobuf[i], &goexecs[i]);
   }
 
+  FILE *monitor_fd;
+  if (access(MONITOR_FNAME, F_OK) == 0) {
+    monitor_fd = fopen(MONITOR_FNAME, "a");
+  } else {
+    monitor_fd = fopen(MONITOR_FNAME, "w");
+
+    // write headers
+    fprintf(monitor_fd, "RNG,epoch,dev 0 temp,dev 0 clock,dev 1 temp,dev 1 clock\n");
+  }
+
+  time_t last_time, this_time;
+  last_time = time(NULL);
+
+  nvmlInit();
   printf("Waiting on GPUs...\n");
-  while (!finished_dev)
+  unsigned int temp, clock;
+  nvmlDevice_t dev;
+  while (!finished_dev) {
+    this_time = time(NULL);
+    if (this_time > last_time + 1) {
+      last_time = time(NULL);
+      fprintf(monitor_fd, "%s,%d,", rngname, epoch);
+      for (size_t dev_n = 0; dev_n < NUM_GPU; ++dev_n) {
+        if (dev_n > 0) fprintf(monitor_fd, ",");
+        nvmlDeviceGetHandleByIndex_v2(dev_n, &dev);
+        nvmlDeviceGetTemperature(dev, NVML_TEMPERATURE_GPU, &temp);
+        nvmlDeviceGetClockInfo(dev, NVML_CLOCK_SM, &clock);
+        fprintf(monitor_fd, "%d,%d", temp, clock);
+      }
+      fprintf(monitor_fd, "\n");
+    }
     sched_yield();
+  }
+  fclose(monitor_fd);
+
   int i = finished_dev - 1;
   // Wait to finish
   cudaSetDevice(i);
@@ -274,40 +314,18 @@ int main(int argc, char **argv) {
 
     // write headers
     fprintf(results_fd, "RNG,execs,seconds,execsps,iters,threads per block,number of blocks,");
-    fprintf(results_fd, "dev name,num devs,dev mem rate (KHz),dev bus width (bits),dev peak mem bandwidth (GB/s),");
-    fprintf(results_fd, "dev 0 temp,dev 0 clock,dev 1 temp,dev 1 clock");
+    fprintf(results_fd, "dev name,num devs,dev mem rate (KHz),dev bus width (bits),dev peak mem bandwidth (GB/s)\n");
   }
-
-#if RNG == CURAND
-  const char* rngname = "CURAND";
-#elif RNG == AES
-  const char* rngname = "AES";
-#elif RNG == CHAM
-  const char* rngname = "CHAM";
-#endif
 
   printf("writing results to ");
   printf(RESULTS_FNAME);
   printf("\n");
-  fprintf(results_fd, "%s,%llu,%f,%f,%d,%d,%d,%s,%d,%d,%d,%f,",
-          rngname, hexecs*NUM_GPU, seconds, (hexecs*NUM_GPU)/seconds, ITERS, N, M,
-          prop.name, NUM_GPU, prop.memoryClockRate, prop.memoryBusWidth,
-          2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e6);
+  fprintf(results_fd, "%s,%llu,%f,%f,%d,%d,%d,%s,%d,%d,%d,%f\n", rngname, hexecs * NUM_GPU, seconds,
+          (hexecs * NUM_GPU) / seconds, ITERS, N, M, prop.name, NUM_GPU, prop.memoryClockRate, prop.memoryBusWidth,
+          2.0 * prop.memoryClockRate * (prop.memoryBusWidth / 8) / 1.0e6);
 
-  uint32_t temp, clock;
-  nvmlDevice_t dev;
-  for (size_t dev_n=0; dev_n<NUM_GPU; ++dev_n) {
-    if (dev_n > 0)
-      fprintf(results_fd, ",");
-    nvmlDeviceGetHandleByIndex_v2(0, &dev);
-    nvmlDeviceGetTemperature(dev, NVML_TEMPERATURE_GPU, &temp);
-    nvmlDeviceGetClockInfo(dev, NVML_CLOCK_GRAPHICS, &clock);
-    fprintf(results_fd, "%d,%d", temp, clock);
-  }
   fprintf(results_fd, "\n");
   fclose(results_fd);
 
-  //We don't need to print result, just benchmarking
-
-
+  // We don't need to print result, just benchmarking
 }
