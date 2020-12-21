@@ -167,6 +167,11 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
 
   int size = varsize; // i think?
 
+#if RNG == CURAND
+  gpuErrchk(cudaMalloc(&gbuf, size * N * M));
+  gpuErrchk(cudaMalloc(&gobuf, sizeof(uint64_t)));
+  gpuErrchk(cudaMalloc(&gexecs, sizeof(unsigned long long)));
+
 #if RNG == AES
   int64_t padded = aes_pad(varsize);
   printf("Padding varsize from %d to %ld\n", varsize, padded);
@@ -182,6 +187,10 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   gpuErrchk(cudaMalloc(&drkey, 176));
   gpuErrchk(cudaMemcpy((uint8_t *)drkey, rkey, sizeof(uint8_t) * 176, cudaMemcpyHostToDevice));
 
+  gpuErrchk(cudaMalloc(&gbuf, padded * N * M));
+  gpuErrchk(cudaMalloc(&gobuf, sizeof(uint64_t)));
+  gpuErrchk(cudaMalloc(&gexecs, sizeof(unsigned long long)));
+
 #elif RNG == CHAM
   int64_t padded = aes_pad(varsize);
   printf("Padding varsize from %d to %ld\n", varsize, padded);
@@ -193,12 +202,12 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   const uint8_t *dkey;
   gpuErrchk(cudaMalloc(&dkey, 16));
   gpuErrchk(cudaMemcpy((uint8_t *)dkey, ckey, 16, cudaMemcpyHostToDevice));
-#endif
 
-  // Alloc GPU buffers
-  gpuErrchk(cudaMalloc(&gbuf, size * N * M));
+  gpuErrchk(cudaMalloc(&gbuf, padded * N * M));
   gpuErrchk(cudaMalloc(&gobuf, sizeof(uint64_t)));
   gpuErrchk(cudaMalloc(&gexecs, sizeof(unsigned long long)));
+
+#endif
 
   *ret_gbuf = gbuf;
   *ret_gobuf = gobuf;
