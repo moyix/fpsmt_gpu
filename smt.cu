@@ -172,7 +172,7 @@ void launch_kernel(int device, int varsize, uint8_t **ret_gbuf, uint64_t **ret_g
   gpuErrchk(cudaMalloc(&gobuf, sizeof(uint64_t)));
   gpuErrchk(cudaMalloc(&gexecs, sizeof(unsigned long long)));
 
-#if RNG == AES
+#elif RNG == AES
   int64_t padded = aes_pad(varsize);
   printf("Padding varsize from %d to %ld\n", varsize, padded);
   unsigned char ckey[AES_BLOCK_SIZE];
