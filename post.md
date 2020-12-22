@@ -68,9 +68,9 @@ We did not have an opportunity to test coverage guided fuzzing. We would expect 
 
 ### Random Number Generation
 
-We tested several methods of random number generation: reduced round AES (specifically, two rounds), CHAM, and cuRAND. As we don’t require a cryptographically secure pseudorandom number generator, we can get away with using encryption algorithms like AES and CHAM. The structure of our fuzzing loop varied depending on which number generator we were using.
+We tested several methods of random number generation: reduced round AES (specifically, two rounds), CHAM, and cuRAND. As we don’t require a cryptographically secure pseudorandom number generator, we can get away with using encryption algorithms like AES and CHAM. The variant of AES we used is CTR. The structure of our fuzzing loop varied depending on which number generator we were using.
 
-The way we used AES and CHAM were quite simple. We initialize a buffer from `urandom` with a segment assigned to each thread. We then cudaMemcpy this buffer onto the GPU. In our fuzzing loop, we encrypt the segment of the buffer then throw it at `LLVMFuzzerTestOneInput`. The urandom initialization is an extra step in the host process before launching the CUDA kernel. Beyond initialization, it is important that all random number generation occurs on the GPU.
+The way we used AES and CHAM were quite simple. We initialize a key for each thread from `urandom`. We then cudaMemcpy the key into a global buffer onto the GPU. In our fuzzing loop, we encrypt a block buffer then throw it at `LLVMFuzzerTestOneInput`. The urandom initialization is an extra step in the host process before launching the CUDA kernel. Beyond initialization, it is important that all random number generation occurs on the GPU.
 
 ![alt aes](svg/aes.mmd.svg)
 
