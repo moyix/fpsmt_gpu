@@ -4,7 +4,7 @@
 
 ## Overview
 
-By applying traditional fuzzing techniques, we achieved high throughput SMT constraint solving.
+By applying traditional fuzzing techniques, we achieved high throughput SMT constraint solving. We were able to achieve 23 billion execs/s using GPU acceleration.
 
 SMT solvers typically apply very complicated algorithms to determine if a set of constraints is satisfiable (and produce a solution). The approach that we have taken is to abandon these fancy methods and try to throw random data at the formula over many many thousands of threads. This is essentially what fuzzing is: we throw random data at a function in an attempt to find a crash. Instead of a crash, here we try to find a solution to the SMT formula.
 
