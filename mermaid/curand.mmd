@@ -1,0 +1,66 @@
+graph LR
+    subgraph CURAND
+
+    subgraph Host
+    mt[main thread]
+    end
+
+    subgraph GPU 0
+    subgraph thread 0
+    fuz00[smt fuzz]
+    buf00[buffer]
+    rng00[curand]
+    fuz00 --> rng00
+    rng00 --> buf00
+    buf00 --> fuz00
+    end
+    subgraph thread 1
+    fuz01[smt fuzz]
+    buf01[buffer]
+    rng01[curand]
+    fuz01 --> rng01
+    rng01 --> buf01
+    buf01 --> fuz01
+    end
+    subgraph thread 2
+    fuz02[smt fuzz]
+    buf02[buffer]
+    rng02[curand]
+    fuz02 --> rng02
+    rng02 --> buf02
+    buf02 --> fuz02
+    end
+    end
+
+    subgraph GPU 1
+    subgraph thread 0
+    fuz10[smt fuzz]
+    buf10[buffer]
+    rng10[curand]
+    fuz10 --> rng10
+    rng10 --> buf10
+    buf10 --> fuz10
+    end
+    subgraph thread 1
+    fuz11[smt fuzz]
+    buf11[buffer]
+    rng11[curand]
+    fuz11 --> rng11
+    rng11 --> buf11
+    buf11 --> fuz11
+    end
+    subgraph thread 2
+    fuz12[smt fuzz]
+    buf12[buffer]
+    rng12[curand]
+    fuz12 --> rng12
+    rng12 --> buf12
+    buf12 --> fuz12
+    end
+    end
+
+
+    mt -.-> fuz00 & fuz01 & fuz02
+    mt -.-> fuz10 & fuz11 & fuz12
+
+    end

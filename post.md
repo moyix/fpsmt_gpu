@@ -1,6 +1,6 @@
 # GPU accelerated SMT constraint solving with LibFuzzer
 
-> By John Cunniff, Nobel Gautam, & Professor Brendan Dollan-Gavitt
+> By John Cunniff, Nobel Gautam, & Professor Brendan Dolan-Gavitt
 
 ## Overview
 
@@ -47,24 +47,22 @@ __device__ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   const Float<8, 24> jfs_ssa_3 = Float<8, 24>(jfs_ssa_0, jfs_ssa_1, jfs_ssa_2);
   const bool jfs_ssa_4 = x.ieeeEquals(jfs_ssa_3);
   if (jfs_ssa_4) {
-	++jfs_num_const_sat;
+    ++jfs_num_const_sat;
   }
   if (jfs_num_const_sat == 1) {
-	// Fuzzing target
-	return 1;
+    // Fuzzing target
+    return 1;
   } else {
-	return 0;
+    return 0;
   }
 }
-// End program
-int varsize = 4;
 ```
 
 Notice the `__device__` annotation next to `LLVMFuzzerTestOneInput`. That lets CUDA know that that function should be run on the GPU rather than the host. Each of our GPU threads will call the `LLVMFuzzerTestOneInput` function in a loop.
 
 ### Fuzzing
 
-Our approach to fuzzing the SMTs is relatively simple. We choose some random number generator to generate input, then throw it at the SMT formulas. There is no feedback or corpus system for potentially improving the quality of input. This is called “blind” fuzzing. 
+Our approach to fuzzing the SMTs is relatively simple. We choose some random number generator to generate input, then throw it at the SMT formulas. There is no feedback or corpus system for potentially improving the quality of input. This is called “blind” fuzzing.
 
 We did not have an opportunity to test coverage guided fuzzing. We would expect that it would significantly reduce the throughput we currently achieve. Whether the increased efficiency of fuzzing outweighs the reduced throughput, we can’t say. This is to say nothing of the complexity of implementing such systems in a multi GPU setup.
 
@@ -100,5 +98,4 @@ Over 750 runs of each number generator on the dual 3090 machine, we can see that
 
 Another way to view this would be the amount of time it takes
 
-![alt epoch time]()
-
+![alt epoch time](img/execsps-over-epoch.png)

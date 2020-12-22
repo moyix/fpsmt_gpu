@@ -2,7 +2,7 @@
 all: lab
 
 lab: venv
-	./venv/bin/jupyter lab --host 0.0.0.0
+	./venv/bin/jupyter lab --host 0.0.0.0 --allow-root
 
 venv:
 	virtualenv -p $(shell which python3) venv

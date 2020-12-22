@@ -1,0 +1,68 @@
+graph LR
+    subgraph CHAM
+
+    subgraph Host
+    mt[main thread]
+    urand((/dev/urandom))
+    mt --> urand
+    end
+
+    subgraph GPU 0
+    subgraph thread 0
+    buf00[buffer]
+    fuz00[smt fuzz]
+    rng00[cham encrypt]
+    buf00 --> fuz00
+    fuz00 --> rng00
+    rng00 --> buf00
+    end
+    subgraph thread 1
+    buf01[buffer]
+    fuz01[smt fuzz]
+    rng01[cham encrypt]
+    buf01 --> fuz01
+    fuz01 --> rng01
+    rng01 --> buf01
+    end
+    subgraph thread 2
+    buf02[buffer]
+    fuz02[smt fuzz]
+    rng02[cham encrypt]
+    buf02 --> fuz02
+    fuz02 --> rng02
+    rng02 --> buf02
+    end
+    end
+
+    subgraph GPU 1
+    subgraph thread 0
+    buf10[buffer]
+    fuz10[smt fuzz]
+    rng10[cham encrypt]
+    buf10 --> fuz10
+    fuz10 --> rng10
+    rng10 --> buf10
+    end
+    subgraph thread 1
+    buf11[buffer]
+    fuz11[smt fuzz]
+    rng11[cham encrypt]
+    buf11 --> fuz11
+    fuz11 --> rng11
+    rng11 --> buf11
+    end
+    subgraph thread 2
+    buf12[buffer]
+    fuz12[smt fuzz]
+    rng12[cham encrypt]
+    buf12 --> fuz12
+    fuz12 --> rng12
+    rng12 --> buf12
+    end
+    end
+
+
+    urand -.-> |cuda memcpy| buf00 & buf01 & buf02
+    urand -.-> |cuda memcpy| buf10 & buf11 & buf12
+
+    end
