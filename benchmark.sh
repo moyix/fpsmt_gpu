@@ -23,11 +23,11 @@ rm results.csv
 iters=750
 for i in $(seq ${iters}); do
     echo "Running smt CURAND [${i}/${iters}]"
-    ./bin/smt-CURAND &>/dev/null
+    ./bin/smt-CURAND $i &>/dev/null
 
     echo "Running smt AES [${i}/${iters}]"
-    ./bin/smt-AES &> /dev/null
+    ./bin/smt-AES $i &> /dev/null
 
     echo "Running smt CHAM [${i}/${iters}]"
-    ./bin/smt-CHAM &> /dev/null
+    ./bin/smt-CHAM $i &> /dev/null
 done
